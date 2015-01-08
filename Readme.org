@@ -1,0 +1,26 @@
+* Application organization tools
+
+This repository contains tools and scripts to manage our application repository.
+
+** Application repository structure
+
+For now, check out: https://wiki.auckland.ac.nz/display/CERES/Application+repository
+
+** app-org.py
+
+A script to auto-generate documentation pages for applications installed on one or more clusters, using the application repository structure outlined above.
+
+More info ( for old, java based application: https://wiki.auckland.ac.nz/pages/viewpage.action?title=Application+documention+generation&spaceKey=CERES )
+
+*** Requirements
+
+    pip install click
+    pip install --pre airspeed
+
+*** Running
+
+    ./app-doc.py
+
+*** Notes
+
+job.properties (can have tags & versions)
