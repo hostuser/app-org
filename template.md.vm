@@ -131,14 +131,14 @@ $H$H$H$H$H Input file(s)
 #end
 
 #foreach ($job_desc in $job.job_descriptions)
-#set( $job_desc_id = $get_desc_id($job_desc))
-#set( $job_desc_md = "${job_desc_id}.md")
+##set( $job_desc_id = $get_desc_id($job_desc))
+##set( $job_desc_md = "${job_desc_id}.md")
 #set( $job_desc_path = "${job_id}/${job_desc}")
 
 $H$H$H$H$H Job description '${job_desc}' ([download]($RAW_URL/jobs/$job_id/$job_desc))
 
 #if ($job.job_descriptions[$job_desc])
-#set( $job_desc_md_path = "${job_id}/${job_desc_md}")
+#set( $job_desc_md_path = "$job_id/${job.job_descriptions[$job_desc]}")
 #parse($job_desc_md_path)
 #end
 

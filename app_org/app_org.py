@@ -7,19 +7,8 @@ import os
 import ConfigParser
 import collections
 
-
-# helper functions
-def list_length(list):
-    return len(list)
-
-
-# get basename of job_description
-def get_desc_id(desc_name):
-    return os.path.splitext(desc_name)[0]
-
-
-# helper class needed to read sectionless property files
 class FakeSecHead(object):
+    """Helper class to read sectionless property files using the python ConfigParser"""
     def __init__(self, fp):
         self.fp = fp
         self.sechead = '[nosection]\n'
@@ -35,7 +24,10 @@ class FakeSecHead(object):
 
 
 def find_versions(path):
-
+    """Helper function to parse a module directory located within an
+    application repository structure, returning all versions of an
+    application sorted by cluster.
+    """
     versions = {}
     for root, dirs, files in os.walk(path):
         if len(files) > 0:
@@ -45,7 +37,39 @@ def find_versions(path):
     return versions
 
 
-class job:
+class AppRepo(object):
+
+    def __init__(self, path):
+        self.path = path
+
+
+pass_apprepo = click.make_pass_decorator(AppRepo)
+
+
+class job(object):
+    """Encapsulates the information located in a job directory (under
+    [application]/jobs in an application repository structure).
+
+    Properties to be used in a template:
+
+    - id: the unique id of the job (name of the base directory)
+    - path: the path to the base directory of the job
+    - versions: dictionary of versions of the application this job
+        will work with, sorted by cluster
+    - tags: list of tags associated with this job
+    - mdfiles: all names of existing *.md files in the base directory
+    - job_descriptions: a dictionary of all *.sl files in the base
+        directory, value is either a corresponding .md file (if
+        exists) or 'None' if no such file exists
+    - job_files_path: the path to the input files for this job
+    - job_files: a list of all input files for this job, relative to
+        job_files_path
+    - properties:
+        a dictionary with optional properties, populated by parsing an
+        optional 'job.properties' file in the base
+        directory. Important ones:
+           - name: the 'pretty' name of the job
+    """
     def __init__(self, path):
         self.path = path
         self.id = os.path.basename(path)
@@ -97,7 +121,9 @@ class job:
         
 
 def find_jobs(path):
-
+    """Returns a sorted dictionary of jobname/job(object) for a
+    specified path."""
+    
     dirs = [f for f in os.listdir(path) if os.path.isdir(os.path.join(path, f))]
     jobs = {}
     for directory in dirs:
@@ -109,7 +135,18 @@ def find_jobs(path):
 
 
 # application class
-class application:
+class application(object):
+    """Class that encapsulates the information for a specific
+    application within an application repository structure.
+
+    Important properties:
+      - name: the name of the application
+      - path: the path to the base directory to this application
+      - versions: a map of versions available for this application,
+          sorted by cluster
+      - doc: the doc object for this application
+      - jobs: a dictionary of jobnames/job objects for this application
+    """
     def __init__(self, app_repo, name):
         self.app_repo = app_repo
         self.name = name
@@ -120,11 +157,17 @@ class application:
 
 
 # documentation class:
-class documentation:
+class documentation(object):
+    """Class to encapsulate all the information in regards to
+    documentation for an application.
+
+    Created by parsing the 'doc' subdirectory of an application within
+    an application repository structure.
+    """
     def __init__(self, application):
         self.application = application
         self.properties = {}
-        self.properties['len'] = list_length
+        self.properties['len'] = len
         self.properties['get_desc_id'] = get_desc_id
         self.tags = []
         self.versions = dict(application.versions)
@@ -152,22 +195,32 @@ class documentation:
             self.mdfiles.append(f)
 
 
-@click.command()
+@click.group()
 @click.option('-a', '--app-repo',
               type=click.Path(exists=True, dir_okay=True),
               help='the path to the applications repository')
+@click.pass_context
+def cli(ctx, app_repo):
+    ctx.obj = AppRepo(os.path.abspath(app_repo))
+
+
+@cli.command()
 @click.option('--template',
               type=click.File(mode='r'),
               help='the template to create the application page')
-def create_doc(app_repo, template):
+@pass_apprepo
+def create_doc(apprepo, template):
     """Generates documentation for one or all applicatiions"""
-
-    create_doc_for_app(app_repo, 'R', template)
+    print type(apprepo)
+    application_repo = apprepo.path
+    create_doc_for_app(application_repo, 'R', template)
 
 
 def create_doc_for_app(app_repo, app_name, template):
-
-    tmp_dir = '/tmp/'+app_name
+    """Generates documentation for an app, using the specified
+    (velocity) template."""
+    
+    tmp_dir = '/tmp/app-org/'+app_name
     shutil.rmtree(tmp_dir, True)
     os.makedirs(tmp_dir)
     shutil.copy2(template, tmp_dir)
@@ -198,5 +251,3 @@ def create_doc_for_app(app_repo, app_name, template):
     print result
 
 
-if __name__ == '__main__':
-    create_doc()

@@ -19,7 +19,7 @@ More info ( for old, java based application: https://wiki.auckland.ac.nz/pages/v
 
 *** Running
 
-    ./app-doc.py
+    ./app-org.py
 
 *** Notes
 
