@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /Usr/bin/python
 
 import click
 import airspeed
@@ -23,6 +23,10 @@ class FakeSecHead(object):
             return self.fp.readline()
 
 
+def get_desc_id(desc_name):
+    return os.path.splitext(desc_name)[0]
+
+
 def find_versions(path):
     """Helper function to parse a module directory located within an
     application repository structure, returning all versions of an
@@ -35,6 +39,15 @@ def find_versions(path):
             versions[cluster] = sorted(files)
 
     return versions
+
+
+def find_apps(path):
+    """Helper function to get all app names from the specified application
+    repository root folder
+    """
+    apps = [f for f in os.listdir(path)
+            if os.path.isdir(os.path.join(path, f))]
+    return apps
 
 
 class AppRepo(object):
@@ -124,14 +137,17 @@ def find_jobs(path):
     """Returns a sorted dictionary of jobname/job(object) for a
     specified path."""
     
-    dirs = [f for f in os.listdir(path) if os.path.isdir(os.path.join(path, f))]
-    jobs = {}
-    for directory in dirs:
-        print directory
-        j = job(os.path.join(path, directory))
-        jobs[j.id] = j
+    if os.path.isdir(path):
+        dirs = [f for f in os.listdir(path) if os.path.isdir(os.path.join(path, f))]
+        jobs = {}
+        for directory in dirs:
+            print directory
+            j = job(os.path.join(path, directory))
+            jobs[j.id] = j
 
-    return collections.OrderedDict(sorted(jobs.items()))
+        return collections.OrderedDict(sorted(jobs.items()))
+    else:
+        return {}
 
 
 # application class
@@ -187,12 +203,13 @@ class documentation(object):
                     self.properties[key] = self.tags
                 else:
                     self.properties[key] = value
+                    
+        if os.path.isdir(self.app_doc_dir):
+            md_files = [f for f in os.listdir(self.app_doc_dir) if f.endswith('.md')]
 
-        md_files = [f for f in os.listdir(self.app_doc_dir) if f.endswith('.md')]
-
-        for f in md_files:
-            self.properties[f] = f
-            self.mdfiles.append(f)
+            for f in md_files:
+                self.properties[f] = f
+                self.mdfiles.append(f)
 
 
 @click.group()
@@ -208,22 +225,28 @@ def cli(ctx, app_repo):
 @click.option('--template',
               type=click.File(mode='r'),
               help='the template to create the application page')
+@click.option('--app', help='comma-seperated list of apps to create documentation for')
 @pass_apprepo
-def create_doc(apprepo, template):
+def create_doc(apprepo, template, app):
     """Generates documentation for one or all applicatiions"""
-    print type(apprepo)
     application_repo = apprepo.path
-    create_doc_for_app(application_repo, 'R', template)
+    if app:
+        apps = app.split(',')
+    else:
+        apps = find_apps(apprepo.path)
+        
+    for a in apps:
+        create_doc_for_app(application_repo, a, template)
 
 
 def create_doc_for_app(app_repo, app_name, template):
     """Generates documentation for an app, using the specified
     (velocity) template."""
-    
+
     tmp_dir = '/tmp/app-org/'+app_name
     shutil.rmtree(tmp_dir, True)
     os.makedirs(tmp_dir)
-    shutil.copy2(template, tmp_dir)
+    shutil.copy2(template.name, tmp_dir)
     loader = airspeed.CachingFileLoader(tmp_dir, True)
     app = application(app_repo, app_name)
     doc = documentation(app)
@@ -237,11 +260,11 @@ def create_doc_for_app(app_repo, app_name, template):
 
         for md_file in job_md_files:
             shutil.copy2(os.path.join(app.jobs[jobid].path, md_file), os.path.join(tmp_dir, jobid))
-            
-    for file in doc.mdfiles:
-        shutil.copy2(os.path.join(doc.app_doc_dir, file), os.path.join(tmp_dir, jobid))
 
-    template = loader.load_template(os.path.basename(template))
+        for file in doc.mdfiles:
+            shutil.copy2(os.path.join(doc.app_doc_dir, file), os.path.join(tmp_dir, jobid))
+
+    template = loader.load_template(os.path.basename(template.name))
 
     properties = dict(doc.properties)
     properties['jobs'] = app.jobs
