@@ -1,5 +1,6 @@
 #! /Usr/bin/python
 
+import sys
 import click
 import airspeed
 import shutil
@@ -7,8 +8,11 @@ import os
 import ConfigParser
 import collections
 
+# --------------------------------------------------------------------------------------
+# Helper functions and classes
 class FakeSecHead(object):
     """Helper class to read sectionless property files using the python ConfigParser"""
+
     def __init__(self, fp):
         self.fp = fp
         self.sechead = '[nosection]\n'
@@ -22,8 +26,18 @@ class FakeSecHead(object):
         else:
             return self.fp.readline()
 
+def list_contains(list, item):
+    """Checks whether a list contains an item"""
+
+    if item in list:
+        return True
+    else:
+        return False
+
 
 def get_desc_id(desc_name):
+    """Get filename without extension"""
+
     return os.path.splitext(desc_name)[0]
 
 
@@ -46,20 +60,117 @@ def find_apps(path):
     repository root folder
     """
     apps = [f for f in os.listdir(path)
-            if os.path.isdir(os.path.join(path, f))]
+            if os.path.isdir(os.path.join(path, f)) and f != '.git']
+
     return apps
 
 
+def find_jobs(path):
+    """Returns a sorted dictionary of jobname/job(object) for a
+    specified path."""
+
+    if os.path.isdir(path):
+        dirs = [f for f in os.listdir(path) if os.path.isdir(os.path.join(path, f))]
+        jobs = {}
+        for directory in dirs:
+            j = Job(os.path.join(path, directory))
+            jobs[j.id] = j
+
+        return collections.OrderedDict(sorted(jobs.items()))
+    else:
+        return {}
+
+
+def check_valid_apps(path, app_list):
+    """Helper function to verify all apps in the list actually have
+    a folder in the application repository.
+    """
+    all_apps = find_apps(path)
+    common_apps = set(app_list).intersection(all_apps)
+    not_valid_apps = set(app_list).difference(all_apps)
+
+    return common_apps, not_valid_apps
+
+
+def create_app_documentation(apprepo, apps, template, output_dir):
+
+    for a in apps:
+        md_text = apprepo.get_app(a).doc.create_doc_page(template)
+        if not output_dir:
+            click.echo(md_text)
+        else:
+            if not os.path.exists(output_dir):
+                os.makedirs(output_dir)
+
+            doc_file = os.path.join(output_dir, a + ".md")
+
+            with open(doc_file, 'w') as text_file:
+                text_file.write(md_text)
+
+
+# --------------------------------------------------------------------------------------
+# Exceptions
+class ApplicationMissingException(Exception):
+    pass
+
+
+# --------------------------------------------------------------------------------------
+# classes
 class AppRepo(object):
+    """Encapsulates an application repository structure"""
 
     def __init__(self, path):
         self.path = path
+        apps = {}
+        for app in find_apps(self.path):
+            apps[app] = Application(self, app)
+
+        # sort applications by name
+        self.apps = collections.OrderedDict(sorted(apps.items(), key=lambda s: s[0].lower()))
 
 
-pass_apprepo = click.make_pass_decorator(AppRepo)
+    def check_valid_apps(self, apps):
+        """Checks whether all the applications in the provided list are present
+
+        :param apps: a list of app name strings
+        :returns: a tupel with a Boolean value for whether all applications are availalbe, and a string message.
+        """
+        valid, not_valid = check_valid_apps(self.path, apps)
+
+        if not_valid:
+            return False, "Invalid applications: " + ', '.join(not_valid)
+        else:
+            return True, "All applications present"
+
+    def get_app(self, app_name):
+        result = self.apps[app_name]
+        if not result:
+            raise ApplicationMissingException("No application '{}' available in '{}".format(app_name, self.path))
+
+        return result
+
+    def create_summary_page(self, template):
+
+        if type(template) is str:
+            template = open(template, 'r')
+
+        tmp_dir = '/tmp/app-org/summary'
+        shutil.rmtree(tmp_dir, True)
+        os.makedirs(tmp_dir)
+        shutil.copy2(template.name, tmp_dir)
+        loader = airspeed.CachingFileLoader(tmp_dir, True)
+
+        template = loader.load_template(os.path.basename(template.name))
+        properties = {}
+
+        properties['applications'] = self.apps
+
+        result = template.merge(properties, loader=loader)
+        return result
 
 
-class job(object):
+
+class Job(object):
     """Encapsulates the information located in a job directory (under
     [application]/jobs in an application repository structure).
 
@@ -83,6 +194,7 @@ class job(object):
         directory. Important ones:
            - name: the 'pretty' name of the job
     """
+
     def __init__(self, path):
         self.path = path
         self.id = os.path.basename(path)
@@ -117,7 +229,7 @@ class job(object):
         for f in sl_files:
             self.properties[f] = f
             sl_id = get_desc_id(f)
-            if os.path.isfile(os.path.join(self.path, sl_id+".md")):
+            if os.path.isfile(os.path.join(self.path, sl_id + ".md")):
                 self.job_descriptions[f] = sl_id + ".md"
             else:
                 self.job_descriptions[f] = None
@@ -126,32 +238,15 @@ class job(object):
             for file in files:
                 relative = root[len(self.job_files_path):]
                 if relative:
-                    self.job_files.append(relative[1:]+"/"+file)
+                    self.job_files.append(relative[1:] + "/" + file)
                 else:
                     self.job_files.append(file)
 
         self.job_files.sort()
-        
-
-def find_jobs(path):
-    """Returns a sorted dictionary of jobname/job(object) for a
-    specified path."""
-    
-    if os.path.isdir(path):
-        dirs = [f for f in os.listdir(path) if os.path.isdir(os.path.join(path, f))]
-        jobs = {}
-        for directory in dirs:
-            print directory
-            j = job(os.path.join(path, directory))
-            jobs[j.id] = j
-
-        return collections.OrderedDict(sorted(jobs.items()))
-    else:
-        return {}
 
 
 # application class
-class application(object):
+class Application(object):
     """Class that encapsulates the information for a specific
     application within an application repository structure.
 
@@ -163,31 +258,30 @@ class application(object):
       - doc: the doc object for this application
       - jobs: a dictionary of jobnames/job objects for this application
     """
+
     def __init__(self, app_repo, name):
         self.app_repo = app_repo
         self.name = name
-        self.path = os.path.join(app_repo, name)
+        self.path = os.path.join(app_repo.path, name)
         self.versions = find_versions(os.path.join(self.path, 'modules'))
-        self.doc = documentation(self)
+        self.doc = Documentation(self)
         self.jobs = find_jobs(os.path.join(self.path, 'jobs'))
 
 
 # documentation class:
-class documentation(object):
+class Documentation(object):
     """Class to encapsulate all the information in regards to
     documentation for an application.
 
     Created by parsing the 'doc' subdirectory of an application within
     an application repository structure.
     """
+
     def __init__(self, application):
         self.application = application
         self.properties = {}
-        self.properties['len'] = len
-        self.properties['get_desc_id'] = get_desc_id
         self.tags = []
         self.versions = dict(application.versions)
-        self.properties['versions'] = self.versions
         self.mdfiles = []
         self.app_doc_dir = os.path.join(application.path, 'doc')
         self.app_properties_file = os.path.join(self.app_doc_dir, 'app.properties')
@@ -200,16 +294,68 @@ class documentation(object):
                     self.versions['N/A'] = [str(value).strip() for value in value.split(',')]
                 if key == 'tags':
                     self.tags = [str(value).strip() for value in value.split(',')]
-                    self.properties[key] = self.tags
                 else:
                     self.properties[key] = value
-                    
+
         if os.path.isdir(self.app_doc_dir):
-            md_files = [f for f in os.listdir(self.app_doc_dir) if f.endswith('.md')]
+            md_files = [f for f in os.listdir(self.app_doc_dir) if f.endswith('.md') and os.path.getsize(os.path.join(self.app_doc_dir, f)) > 0]
 
             for f in md_files:
-                self.properties[f] = f
                 self.mdfiles.append(f)
+
+
+    def create_doc_page(self, template):
+        """Generates documentation for an app, using the specified
+        (velocity) template."""
+
+        if type(template) is str:
+            template = open(template, 'r')
+
+        tmp_dir = '/tmp/app-org/' + self.application.name
+        shutil.rmtree(tmp_dir, True)
+        os.makedirs(tmp_dir)
+        shutil.copy2(template.name, tmp_dir)
+        loader = airspeed.CachingFileLoader(tmp_dir, True)
+
+        for jobid in self.application.jobs:
+            job_descriptions = self.application.jobs[jobid].job_descriptions
+            job_md_files = self.application.jobs[jobid].mdfiles
+            os.makedirs(os.path.join(tmp_dir, jobid))
+            for job_desc in job_descriptions:
+                shutil.copy2(os.path.join(self.application.jobs[jobid].path, job_desc), os.path.join(tmp_dir, jobid))
+
+            for md_file in job_md_files:
+                shutil.copy2(os.path.join(self.application.jobs[jobid].path, md_file), os.path.join(tmp_dir, jobid))
+
+        for file in self.mdfiles:
+            shutil.copy2(os.path.join(self.app_doc_dir, file), tmp_dir)
+
+        template = loader.load_template(os.path.basename(template.name))
+
+        # self.properties contains mainly the properties from the app.properties file
+        properties = dict(self.properties)
+
+        # helper functions
+        properties['len'] = len
+        properties['get_desc_id'] = get_desc_id
+        properties['contains'] = list_contains
+
+        properties['md_files'] = self.mdfiles
+        properties['jobs'] = self.application.jobs
+        properties['application'] = self.application
+        properties['versions'] = self.versions
+
+        result = template.merge(properties, loader=loader)
+        return result
+
+    def has_tag(self, tag):
+        return tag in self.tags
+
+
+# --------------------------------------------------------------------------------------
+# Click cli stuff
+
+pass_apprepo = click.make_pass_decorator(AppRepo)
 
 
 @click.group()
@@ -220,57 +366,79 @@ class documentation(object):
 def cli(ctx, app_repo):
     ctx.obj = AppRepo(os.path.abspath(app_repo))
 
+@cli.command()
+@click.option('--template',
+              type=click.File(mode='r'),
+              help='the template to create the summary page')
+@click.option('--output-file', help='file to write summary page to')
+@pass_apprepo
+def create_summary(apprepo, template, output_file):
+    """Generates a summary page with links to application sub-pages"""
+
+    result = apprepo.create_summary_page(template)
+    if not output_file:
+        click.echo(result)
+    else:
+        with open(output_file, 'w') as text_file:
+            text_file.write(result)
+
+
+@cli.command()
+@click.option('--template-dir',
+              type=click.Path(exists=True, dir_okay=True),
+              help='the path to where the templates are stored')
+@click.option('--templates', help='comma-seperated list of templates to process, of not specified all files with an .md.vm extension will be used')
+@click.option('--app-template', help='the template to use to create application pages, default: "app.md.vm"', default="app.md.vm")
+@click.option('--output-dir', help='the directory to write the documentation into, application pages will be written in a subdirectory called "apps"')
+@pass_apprepo
+def create_all(apprepo, templates, template_dir, app_template, output_dir):
+
+    if templates:
+        templates = templates.split(",")
+    else:
+        templates = [f for f in os.listdir(template_dir) if f.endswith('.md.vm')]
+
+    if app_template in templates:
+        templates.remove(app_template)
+
+
+    template = open(os.path.join(template_dir, app_template), 'r')
+    create_app_documentation(apprepo, apprepo.apps.keys(), template, os.path.join(output_dir, "apps"))
+
+    for t in templates:
+
+        result = apprepo.create_summary_page(os.path.join(template_dir, t))
+        output_file = os.path.join(output_dir, os.path.splitext(t)[0])
+        with open(output_file, 'w') as text_file:
+            text_file.write(result)
+
+
+
 
 @cli.command()
 @click.option('--template',
               type=click.File(mode='r'),
               help='the template to create the application page')
 @click.option('--app', help='comma-seperated list of apps to create documentation for')
+@click.option('--output-dir', help='directory to write documentation to')
 @pass_apprepo
-def create_doc(apprepo, template, app):
+def create_doc(apprepo, template, app, output_dir):
     """Generates documentation for one or all applicatiions"""
-    application_repo = apprepo.path
+
     if app:
         apps = app.split(',')
+        valid, msg = apprepo.check_valid_apps(apps)
+        if not valid:
+            click.echo(msg)
+            sys.exit(1)
     else:
-        apps = find_apps(apprepo.path)
-        
-    for a in apps:
-        create_doc_for_app(application_repo, a, template)
+        apps = apprepo.apps.keys()
 
 
-def create_doc_for_app(app_repo, app_name, template):
-    """Generates documentation for an app, using the specified
-    (velocity) template."""
-
-    tmp_dir = '/tmp/app-org/'+app_name
-    shutil.rmtree(tmp_dir, True)
-    os.makedirs(tmp_dir)
-    shutil.copy2(template.name, tmp_dir)
-    loader = airspeed.CachingFileLoader(tmp_dir, True)
-    app = application(app_repo, app_name)
-    doc = documentation(app)
-
-    for jobid in app.jobs:
-        job_descriptions = app.jobs[jobid].job_descriptions
-        job_md_files = app.jobs[jobid].mdfiles
-        os.makedirs(os.path.join(tmp_dir, jobid))
-        for job_desc in job_descriptions:
-            shutil.copy2(os.path.join(app.jobs[jobid].path, job_desc), os.path.join(tmp_dir, jobid))
-
-        for md_file in job_md_files:
-            shutil.copy2(os.path.join(app.jobs[jobid].path, md_file), os.path.join(tmp_dir, jobid))
-
-        for file in doc.mdfiles:
-            shutil.copy2(os.path.join(doc.app_doc_dir, file), os.path.join(tmp_dir, jobid))
-
-    template = loader.load_template(os.path.basename(template.name))
-
-    properties = dict(doc.properties)
-    properties['jobs'] = app.jobs
-    properties['application'] = app
-
-    result = template.merge(properties, loader=loader)
-    print result
+    create_app_documentation(apprepo, apps, template, output_dir)
 
 
+
+
+if __name__ == '__main__':
+    cli()

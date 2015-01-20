@@ -1,0 +1,9 @@
+
+#set( $H = '#' )
+
+
+#foreach ($app in $applications)#set( $doc = $applications[$app].doc )#set( $application_name = $application[$app].name)#set ($application = $applications[$app].name)#if( $doc.has_tag('compiler'))* [$application](${application})
+#end#end
+
+
+

@@ -68,21 +68,21 @@ Available variables:
 
 $H$H$H Details
 
- * **Homepage**: #if ($homepage) $homepage #else n/a#end
+ * **Homepage**: #if ($homepage) [$homepage]($homepage) #else n/a#end
 
  * **Versions available**:
 #foreach ($location in $versions)
-   * $location
-#foreach ($version in $versions[$location])    - $version
+    * $location
+#foreach ($version in $versions[$location])        - $version
 #end
 #end
 
 #if ($licensing) * **Licensing**: ${licensing}#end
 
 
-#if (${Description_md})
+#if ($contains($md_files, 'Description.md'))
 
-#parse ( ${Description_md} )
+#parse ( 'Description.md' )
 #elseif(${short_description})
 
 ${short_description}
@@ -92,19 +92,19 @@ There is no documentation for this application provided yet. Please contact eres
 #end
 
 
-#if ($Usage_md)
+#if ($contains($md_files, 'Usage.md'))
 
 $H$H$H Usage
 
-#parse ( $Usage_md )
+#parse ( 'Usage.md' )
 #end
 
 
-#if ($Scalability_md)
+#if ($contains($md_files, "Scalability.md"))
 
 $H$H$H Scalability
 
-#parse ( $Scalability_md )
+#parse ( 'Scalability.md' )
 #end
 
 $H$H$H Example SLURM jobs
@@ -114,12 +114,14 @@ $H$H$H Example SLURM jobs
 #set( $job_id = $job.id)
 #set( $job_name = $job.properties["name"])
 #set( $job_input_files = $job.job_files)
-$H$H$H$H $job_name
+$H$H$H$H ${job_name}
 
 #if($job.properties["Description.md"])
 #set( $job_description_md = "${job_id}/Description.md")
 #parse(${job_description_md})
 #end
+
+$H$H$H$H$H Job repository folder: [$job_name]($URL/$application.name/jobs/$job_id)
 
 ## input files
 #if($len($job_input_files) > 0)
@@ -135,7 +137,7 @@ $H$H$H$H$H Input file(s)
 ##set( $job_desc_md = "${job_desc_id}.md")
 #set( $job_desc_path = "${job_id}/${job_desc}")
 
-$H$H$H$H$H Job description '${job_desc}' ([download]($RAW_URL/jobs/$job_id/$job_desc))
+$H$H$H$H$H Job description: ${job_desc} [(download)]($RAW_URL/jobs/$job_id/$job_desc)
 
 #if ($job.job_descriptions[$job_desc])
 #set( $job_desc_md_path = "$job_id/${job.job_descriptions[$job_desc]}")
@@ -146,7 +148,6 @@ $H$H$H$H$H Job description '${job_desc}' ([download]($RAW_URL/jobs/$job_id/$job_
 #include(${job_desc_path})
 ```
 #end
-$H$H$H$H$H [repository link]($URL/$application.name/jobs/$job_id)
 #end
 #else
 There are no Slurm job files provided yet. Please contact eresearch@nesi.org.nz.
