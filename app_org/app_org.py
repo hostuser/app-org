@@ -41,6 +41,10 @@ def get_desc_id(desc_name):
     return os.path.splitext(desc_name)[0]
 
 
+def has_tag(tag_list, tag):
+    return tag in tag_list
+
+
 def find_versions(path):
     """Helper function to parse a module directory located within an
     application repository structure, returning all versions of an
@@ -162,6 +166,12 @@ class AppRepo(object):
 
         template = loader.load_template(os.path.basename(template.name))
         properties = {}
+
+        # helper functions
+        properties['len'] = len
+        properties['get_desc_id'] = get_desc_id
+        properties['contains'] = list_contains
+        properties['has_tag'] = has_tag
 
         properties['applications'] = self.apps
 
@@ -292,7 +302,7 @@ class Documentation(object):
             for key, value in Config.items('nosection'):
                 if key == 'versions':
                     self.versions['N/A'] = [str(value).strip() for value in value.split(',')]
-                if key == 'tags':
+                elif key == 'tags':
                     self.tags = [str(value).strip() for value in value.split(',')]
                 else:
                     self.properties[key] = value
@@ -339,18 +349,20 @@ class Documentation(object):
         properties['len'] = len
         properties['get_desc_id'] = get_desc_id
         properties['contains'] = list_contains
+        properties['has_tag'] = has_tag
 
         properties['md_files'] = self.mdfiles
         properties['jobs'] = self.application.jobs
         properties['application'] = self.application
         properties['versions'] = self.versions
+        properties['tags'] = self.tags
 
         result = template.merge(properties, loader=loader)
         return result
 
     def has_tag(self, tag):
-        return tag in self.tags
 
+        return has_tag(self.application.tags, tag)
 
 # --------------------------------------------------------------------------------------
 # Click cli stuff
@@ -364,10 +376,11 @@ pass_apprepo = click.make_pass_decorator(AppRepo)
               help='the path to the applications repository')
 @click.pass_context
 def cli(ctx, app_repo):
-    ctx.obj = AppRepo(os.path.abspath(app_repo))
+    if app_repo:
+        ctx.obj = AppRepo(os.path.abspath(app_repo))
 
-@cli.command()
-@click.option('--template',
+@cli.command(name='create-summary', short_help='renders a summary page using a template')
+@click.option('--template', required=True,
               type=click.File(mode='r'),
               help='the template to create the summary page')
 @click.option('--output-file', help='file to write summary page to')
@@ -383,13 +396,13 @@ def create_summary(apprepo, template, output_file):
             text_file.write(result)
 
 
-@cli.command()
+@cli.command(name='create-all', short_help='renders summaries as well as application specific documentation in one go, all templates used must be in the same directory')
 @click.option('--template-dir',
               type=click.Path(exists=True, dir_okay=True),
               help='the path to where the templates are stored')
 @click.option('--templates', help='comma-seperated list of templates to process, of not specified all files with an .md.vm extension will be used')
 @click.option('--app-template', help='the template to use to create application pages, default: "app.md.vm"', default="app.md.vm")
-@click.option('--output-dir', help='the directory to write the documentation into, application pages will be written in a subdirectory called "apps"')
+@click.option('--output-dir', help='the directory to write the documentation into, application pages will be written in a subdirectory called "apps"', required=True)
 @pass_apprepo
 def create_all(apprepo, templates, template_dir, app_template, output_dir):
 
@@ -415,8 +428,8 @@ def create_all(apprepo, templates, template_dir, app_template, output_dir):
 
 
 
-@cli.command()
-@click.option('--template',
+@cli.command(name='create-doc', short_help='renders application-specific documentation using a template')
+@click.option('--template', required=True,
               type=click.File(mode='r'),
               help='the template to create the application page')
 @click.option('--app', help='comma-seperated list of apps to create documentation for')
@@ -436,7 +449,6 @@ def create_doc(apprepo, template, app, output_dir):
 
 
     create_app_documentation(apprepo, apps, template, output_dir)
-
 
 
 

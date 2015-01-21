@@ -1,51 +1,5 @@
 #*
-About this template:
-
-   This template will create a page that lists and links to application documentation pages, drawing information from different sources that
-   are stored in a structured application repository (for example: https://github.com/nesi/applications). You can use
-   every target format you want (html, xml, markdown, ..), by default we use markdown to be used in the Github wiki.
-
-   It will be used by the Velocity template engine (http://velocity.apache.org/ - version 1.7) and therefor is written
-   in the Velocity template language (VTL). Check out http://velocity.apache.org/engine/devel/vtl-reference-guide.html
-   for information on how to use it.
-
-   All the variables are Java objects, so you can call methods on them (for example: getName() on a File object).
-
-Note:
-   If you want a hash (#) to be rendered, it's easiest to asign it to a variableQ ( #set( $H = '#' ) ).
-   This is because hash is used as a marker character within the velocity template engine
-
-Available variables:
-
-   * applications
-       - a map of all applications that were specified to be processed (either all, selected ones or ones that contain a specific tag)
-       - map key is the anme of the application, map value is the 'Documentation' object for this application (check out the associated java class here: https://github.com/nesi/app-manage/blob/develop/src/main/java/nz/org/nesi/appmanage/model/Documentation.java)
-       - the 'Documentation' object has the following methods:
-            * getVersion() : a collection of all available versions for this application
-            * getModuleContents() : a map that contains the content of every module for this application ( key: module name, value: content of module as string)
-            * getApplicationFolder() : the path to the folder for this application (in the repository) as a Java File object
-            * getDocumentationFolder() : the path to the documentation folder for this application (in the repository) as a Java File object
-            * getApplicationName : the name of the application
-            * hasTag(<tag>) : checks whether this application is tagged with the specified tag
-            * getTags() : a list of all tags for this application
-            * getProperties() : a list of all properties that are used to render the application documentation page (see application template)
-            * getDocPageContent() : the application documentation page as a string
-            * getJobs() : a collection of all example jobs in the 'jobs' subdirectory (e.g. https://github.com/nesi/applications/tree/master/Java/jobs)
-                  - methods that can be called on that object:
-                        * getJobsFolder() : reference to the 'jobs' folder in the file system
-                        * getJobs() : all jobs (Grisu & LL job descriptions)
-                        * getLlJobs() : all jobs with a LL job description
-                        * getGrisuJobs() : all jobs with a Grisu job description
-                        * hasLlJobs() : whether this application has any jobs with a LL job description
-                        * hasGrisuJobs() : whether this application has any jobs with a Grisu job description
-                  - methods that can be called on the 'job' object you get when iterating through the getJobs() method:
-                        * getJobFolder() : the path to the folder (as Java File object)
-                        * getJobBaseName() : the name of this job (aka name of the folder that contains the job)
-                        * getGrisuJobDescription() : the path to the Grisu job description for this job (as a Java File object)
-                        * getLoadLevelerJobDescription() : the path to the LL job description for this job (as a Java File object)
-                        * getGrisu() : the Grisu job description as a String
-                        * getLl() : the LL job description as a String
-                        * getInputFiles() : a collection of the paths to all the input files for this job
+Check out [TODO] for available properties
 *#
 
 #set( $H = '#' )

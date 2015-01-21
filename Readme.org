@@ -14,12 +14,17 @@ More info ( for old, java based application: https://wiki.auckland.ac.nz/pages/v
 
 *** Requirements
 
-    pip install click
-    pip install --pre airspeed
+ - pip install click
+ - pip install --pre airspeed
+
+*** Installing
+
+    cd app-org
+    pip install --editable .
 
 *** Running
 
-    ./app-org.py
+    app-org.py --help
 
 *** Notes
 
